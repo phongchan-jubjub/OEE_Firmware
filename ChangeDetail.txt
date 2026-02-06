@@ -1,0 +1,33 @@
+V2.0 – เวอร์ชันใช้งานจริง (เสถียร+ทนเน็ตล่ม)
+
+Offline durability: เพิ่ม LittleFS FIFO Queue เก็บ log เป็นไฟล์ .json ส่งไม่ได้ก็เข้าคิว, ออนไลน์แล้ว flush อัตโนมัติ
+
+โครงสร้าง /queue, ตัวนับ ctr.txt, จำกัดคิวสูงสุด, ล้างคิวเก่าเมื่อเต็ม
+
+กลไก HARD_RESET_LIMIT + cooldown ป้องกันคิวโตผิดปกติ
+
+ส่งข้อมูลทนล้มเหลว: HTTP POST แบบ retry N ครั้ง (กำหนด POST_RETRY_MAX + POST_RETRY_DELAY_MS)
+
+เสถียรภาพ I/O: กำหนดลำดับ init ที่ถูกต้อง + ตั้ง modbusSerial.setTimeout(1000)
+
+modbusSerial.begin(...) → modbusSerial.setTimeout(...) → node.begin(...)
+
+Watchdog แม่นยำขึ้น: ใช้ ISR + Ticker 100 ms ตั้งธง g_sensorTimeoutFired แล้วค่อยรีสตาร์ทใน loop() (ปลอดภัยกว่ารีสตาร์ทจาก ISR ตรง ๆ)
+
+Flow กลับมาออนไลน์ดีขึ้น: ตรวจจับ “เพิ่งออนไลน์” แล้ว flushQueue() ทันที + flush ตอนบูตถ้าออนไลน์
+
+ความเรียบร้อย: delay เวลาตั้งค่ารีจิสเตอร์, แยก USE_MOCK_MODBUS ชัดเจน (พร้อมทดสอบ), จัดระเบียบ log/ข้อความสถานะบน LCD
+
+ไม่สูญเสียข้อมูล: เน็ตล่ม/เซิร์ฟเวอร์ล้ม → ข้อมูลเข้า LittleFS ไม่หาย
+Comparison Table (V1.0 → V2.0)
+Feature	V1.0	V2.0
+Offline log handling	None → lost data	LittleFS FIFO Queue + flush
+API send	Single attempt only	Multi-retry before queueing
+Queue management	–	Max size, auto-purge oldest, HARD_RESET_LIMIT
+Watchdog	Polling, restart directly	ISR flag + controlled restart
+Modbus init	Wrong order (unstable)	Correct order + timeout
+Startup behavior	No queue handling	Flush queue on boot if online
+Wi-Fi reconnect	Only reconnect	Reconnect + auto flush queue
+Testing support	Partial	Clear USE_MOCK_MODBUS mode
+Data loss risk	High	Very low
+Code/log clarity	Basic	Structured logs, LCD status, delay handling
